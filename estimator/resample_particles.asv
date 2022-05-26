@@ -1,0 +1,33 @@
+function [x_resamp,w_resamp,index] = resample_particles(x_particle, w_particle)
+    % Get dimensionality of particles:
+    dim = size(x_particle,1);
+
+    % Cumulative Sum of Particles
+    w_particle = w_particle(:);
+    c = cumsum(w_particle);
+
+    % Compute u Vector
+    u = zeros(n,1);
+    u(1) = n\rand(1);
+    u(2:n) = u(1) + n\(1:n-1)';
+
+    % Pre-allocate Index
+    index = zeros(n,1);
+
+    % Compute Index for Resampling 
+    ii = 1;
+    for jj = 1:n
+        while u(jj) > c(ii)
+            ii = ii+1;
+        end
+        index(jj) = ii;
+    end
+
+    % Resampled Data
+    x_resamp = x_particle(:,index);
+    w_resamp = (n+1)\ones(1,n+1);
+
+    % Jitter the particles:
+    x_resamp = x_resamp + randn(dim, size(x_resamp,2));
+    x_resamp = [x_resamp, self.x_ha];
+end
