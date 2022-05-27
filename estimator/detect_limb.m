@@ -17,16 +17,16 @@ function [limb_out] = detect_limb(img,limb_width,output_width)
     end
     
     % Extract only the connected parts of the limb:
-    limb = ExtractNLargestBlobs(limb, 1);
+%     limb = ExtractNLargestBlobs(limb, 1);
     
-    if output_width ~= limb_width
-        limb_out = zeros(size(limb));
-        for row = 1:size(limb,1)
-            if any(limb(row,:))
-                limb_out(row, find(limb(row,:),output_width,'last')) = 1;
-            end
-        end
-    else
+%     if output_width ~= limb_width
+%         limb_out = zeros(size(limb));
+%         for row = 1:size(limb,1)
+%             if any(limb(row,:))
+%                 limb_out(row, find(limb(row,:),output_width,'last')) = 1;
+%             end
+%         end
+%     else
         limb_out = limb;
-    end
+%     end
 end

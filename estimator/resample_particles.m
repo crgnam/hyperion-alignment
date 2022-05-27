@@ -1,8 +1,10 @@
-function [x_resamp,w_resamp,index] = resample_particles(x_particle, w_particle, jitter)
+function [x_resamp,w_resamp,index] = resample_particles(x_particle, w_particle, jitter, n)
     % Get dimensionality of particles:
     dim = size(x_particle,1);
-    n = size(x_particle,2);
-
+    if nargin == 3
+        n = size(x_particle,2);
+    end
+        
     % Cumulative Sum of Particles
     w_particle = w_particle(:);
     c = cumsum(w_particle);

@@ -13,10 +13,14 @@ function [x_r,y_r] = order_limb_points(x_u, y_u)
     remaining_pts = 1:N;
     remaining_pts(remaining_pts == start_ind) = [];
     
+    % TODO: Alternative using boundary?
+%     k = boundary(x_u,y_u);
+%     outline = [x_u(k)'; y_u(k)'];
+%     plot(outline(1,:),outline(2,:),'g','LineWidth',2)
+    
     % Loop through:
     pts = [x_u, y_u]';
-    tol = 5;
-    
+    tol = 25;
     for ii = 1:N-1
         % Identify the remaining points:
         pts_consider = pts(:,remaining_pts);
@@ -35,7 +39,6 @@ function [x_r,y_r] = order_limb_points(x_u, y_u)
         % Remove the currently used point:
         remaining_pts(remaining_pts == used_point) = [];
     end
-    
     x_r(isnan(x_r)) = [];
     y_r(isnan(y_r)) = [];
 end

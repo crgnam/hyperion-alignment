@@ -3,10 +3,30 @@ addpath(genpath('src'))
 addpath(genpath('lib'))
 addpath(genpath('estimator'))
 
-% Settings:
+% Load the image to be processed:
+reference_image = 'simulated_data/test_image0.png';
+true_roll = 111; %(degrees)
+true_pitch = 33; %(degrees)
+true_yaw = 22; %(degrees)
+
+% reference_image = 'simulated_data/test_image1.png';
+% true_roll = -105;
+% true_pitch = 11.3;
+% true_yaw = 135;
+
+
+%% Settings:
 distance_to_hyperion = 1000;
-reference_image = 'simulated_data/reference_3.png';
-max_iterations = 10;
+
+min_particles = 50;
+
+step_size = 10; % degrees
+
+iterations = 5;
+min_step = 1; %(degrees)
+rescale = 1/2;
+
+animate = true;
 
 %% Setup:
 % Load in shape model:
@@ -26,7 +46,7 @@ camera.set_pose([distance_to_hyperion;0;0], quat_to_rotmat([0.5; 0.5; 0.5; 0.5])
 ref = imread(reference_image);
 
 % Obtain the limb:
-limb = detect_limb(ref,2,1);
+limb = detect_limb(ref,1,1);
 
 % Order limb points:
 [yl,xl] = find(limb);
@@ -37,43 +57,53 @@ limb = [xl'; yl'];
 limb = subdivide_line(limb, 1, false);
 
 %% Generate initial particle distribution:
-num_yaw = 36/2;
-num_pitch = 18/2;
-yaw_span   = linspace(0,2*pi,num_yaw);
-pitch_span = linspace(-pi/2, pi/2,num_pitch);
-
-N = num_yaw*num_pitch;
-quats = zeros(4,N);
+yaw_span   = 0:deg2rad(step_size):2*pi;
+pitch_span = (-pi/2):deg2rad(step_size):(pi/2);
 [P,Y] = meshgrid(pitch_span,yaw_span);
 pitch = P(:)';
 yaw   = Y(:)';
-weights = ones(length(pitch),1);
+
+% Randomly sample rather than use even spread:
+% pitch = pi*rand(1,num_particles) - pi/2;
+% yaw   = 2*pi*rand(1,num_particles);
+
+% Particles:
+particles = [yaw; pitch];
+weights   = ones(size(yaw));
 
 %% Perform Estimation:
-for iter = 1:max_iterations
-    fprintf('Beginning Iteration %i/%i\n', iter, max_iterations)
+tic
+if animate
+    v = VideoWriter('distribution.mp4','MPEG-4');
+    v.FrameRate = 1;
+    open(v);
+end
+
+for iter = 1:iterations
+    fprintf('Iteration %2i/%2i (Step Size: %6.3f)\n', iter, iterations, step_size)
+    yaw   = particles(1,:);
+    pitch = particles(2,:);
+    N = length(pitch);
+    quats = zeros(4,N);
     for ii = 1:N
         rotmat = euler321_to_rotmat(0, pitch(ii), yaw(ii));
         quats(:,ii) = rotmat_to_quat(rotmat);
     end
     
-    
-    % Show the current distribution:
-%     cla
-%     draw_density(rad2deg(yaw), rad2deg(pitch),...
-%                  linspace(0,360,round(360/num_pitch)),...
-%                  linspace(-90,90,round(180/num_yaw))); hold on
-%     drawnow
-    if iter == 1
-        h1 = plot(rad2deg(yaw),rad2deg(pitch),'.k'); hold on
-    else
-        set(h1,'XData',rad2deg(yaw), 'YData',rad2deg(pitch)) 
+    % Plot the particle distribution:
+    if animate
+        cla
+        draw_density(particles, step_size); hold on
+        plot(true_yaw,true_pitch,'xk','MarkerSize',5,'LineWidth',1)
+        drawnow
+        frame = getframe(gcf);
+        writeVideo(v,frame);
     end
+    
 
-    % Run Estimation:;
-    rms = zeros(N,1);
-    score = zeros(N,1);
-    roll = zeros(N,1);
+    % Run Estimation:
+    rms = zeros(1,N);
+    roll = zeros(1,N);
     best_rms = inf;
     for ii = 1:N
         % Update the model with current pose:
@@ -90,69 +120,62 @@ for iter = 1:max_iterations
         % Identify best limb match for current orientation:
         [rms(ii),R,~] = match_outline_limb(outline, limb);
 
-        roll(ii) = -sign(R(2,1))*acosd(R(1,1));
-        score(ii) = 1/rms(ii);
+        roll(ii) = -sign(R(2,1))*acos(R(1,1));
 
         if rms(ii) < best_rms
             best_rms = rms(ii);
-%             fprintf('    New Best RMS: %f (found in particle: %i/%i)\n', rms(ii), ii, N);
+            fprintf('  New Best (%3i/%3i) | yaw = %8.3f | pitch = %8.3f | roll = %8.3f | RMS: %7.3f\n',...
+                     ii,N,rad2deg(yaw(ii)),rad2deg(pitch(ii)),rad2deg(roll(ii)), rms(ii))
         end
-        fprintf('%i/%i\n',ii,N)
     end
     
-    % Resample particles:
-    new_weights = weights.*score;
-    rescaled_weights = new_weights/sum(new_weights);
-    jitter = deg2rad(2);
+    % Do not resample if max iterations has been reached:
+    score = 1./rms.^3;
+    if iter == iterations
+        break
+    end
+    if step_size < min_step
+        break
+    end
     
-    [particles,weights] = resample_particles([pitch; yaw], rescaled_weights, jitter);
-    pitch = particles(1,:);
-    yaw = particles(2,:);
+    % Particle resampling:
+    step_size = rescale*step_size;
+    weights = ones(1,N);
+    score = score/sum(score);
+    color = [1-score', score', zeros(size(score))']./max(score);
+    jitter = deg2rad(step_size)/3;
+    weights = weights.*score;
+    yaw = particles(1,:);
+    pitch = particles(2,:);
+    new_particles = max([min_particles, round(N*rescale)]);
+    [particles,weights,index] = resample_particles(particles, weights, jitter, new_particles);
+end
+toc
+best_ind = (score == max(score));
+estimated_roll  = roll(best_ind);
+estimated_yaw   = yaw(best_ind);
+estimated_pitch = pitch(best_ind);
+fprintf('Estimate: yaw = %f, pitch %f, roll = %f\n',...
+         rad2deg(estimated_yaw),rad2deg(estimated_pitch),rad2deg(estimated_roll))
+if animate
+%     plot(rad2deg(estimated_yaw), rad2deg(estimated_pitch), 'og','MarkerSize',5,'LineWidth',2);
+    close(v)
 end
 
-% Show the current distribution:
-cla
-draw_density(rad2deg(yaw), rad2deg(pitch),...
-             linspace(0,360,round(360/num_pitch)),...
-             linspace(-90,90,round(180/num_yaw)));
-%         plot(rad2deg(yaw),rad2deg(pitch),'.k')
-drawnow
-
-%% Plot Results:
-best_ind = score==max(score);
-estimated_roll = deg2rad(roll(best_ind));
-estimated_pitch = pitch(best_ind);
-estimated_yaw = yaw(best_ind);
-estimated_rotmat = euler321_to_rotmat(estimated_roll, estimated_pitch, estimated_yaw);
-
+%% Show the Estimated Orientation:
 figure()
-    surf(rad2deg(Y),rad2deg(P),reshape(score,size(P)),'EdgeColor','none','FaceColor','interp'); hold on
-    plot3(22,33,2,'xk','MarkerSize',10,'LineWidth',3)
-    plot3(rad2deg(estimated_yaw),rad2deg(estimated_pitch),2,'or','MarkerSize',10,'LineWidth',2);
-    plot3(rad2deg(Y),rad2deg(P),2*ones(size(P)),'.k')
-    view([0 90])
-    axis equal
-    xlabel('Yaw')
-    ylabel('Pitch')
-    xlim([0 360])
-    ylim([-90 90])
-    title('Matching Score (1/RMS)')
-    colorbar
-    legend('Similarity','Truth','Estimate')
-    set(findall(gcf,'-property','FontSize'),'FontSize',20)
+subplot(1,2,1)
+    imshow(ref)
+    title('Reference Image')
 
-figure()
-    subplot(1,2,1)
-        imshow(ref)
-        title('Reference Image')
-
-    subplot(1,2,2)
-        model.set_pose(zeros(3,1),estimated_rotmat);
-        model.reset()
-        model.draw('FaceColor',[.5, .5, .5], 'EdgeColor',[.3,.3,.3])
-        view(90,0)
-        xlim([-inf inf]); ylim([-inf inf]); zlim([-inf inf])
-        title('Estimated Orientation')
-        set(gca,'XTick',[]); set(gca,'YTick',[]); set(gca,'ZTick',[]);
-        set(gca,'XTickLabel',[]); set(gca,'YTickLabel',[]); set(gca,'ZTickLabel',[]);
-    set(findall(gcf,'-property','FontSize'),'FontSize',20)
+subplot(1,2,2)
+    estimated_rotmat = euler321_to_rotmat(estimated_roll, estimated_pitch, estimated_yaw);
+    model.set_pose(zeros(3,1),estimated_rotmat);
+    model.reset()
+    model.draw('FaceColor',[.5, .5, .5], 'EdgeColor',[.3,.3,.3])
+    view(90,0)
+    xlim([-inf inf]); ylim([-inf inf]); zlim([-inf inf])
+    title('Estimated Orientation')
+    set(gca,'XTick',[]); set(gca,'YTick',[]); set(gca,'ZTick',[]);
+    set(gca,'XTickLabel',[]); set(gca,'YTickLabel',[]); set(gca,'ZTickLabel',[]);
+set(findall(gcf,'-property','FontSize'),'FontSize',20)
