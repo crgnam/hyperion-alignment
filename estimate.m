@@ -20,14 +20,14 @@ addpath(genpath('estimator'))
 % true_yaw = 73;
 
 % reference_image = 'simulated_data/test_image4.png';
-% true_roll = 60;
-% true_pitch = 77;
-% true_yaw = 290;
+% true_roll = 160;
+% true_pitch = -45;
+% true_yaw = 240;
 
 reference_image = 'simulated_data/test_image5.png';
-true_roll = 160;
-true_pitch = -45;
-true_yaw = 240;
+true_roll = 60;
+true_pitch = 77;
+true_yaw = 290;
 
 %% Settings:
 distance_to_hyperion = 1000;
