@@ -2,8 +2,8 @@ function [] = draw_density(particles, step_size)
     % Bin the data:
     yaw   = rad2deg(particles(1,:));
     pitch = rad2deg(particles(2,:));
-    pitch_range = -90:step_size:90;
-    yaw_range = 0:step_size:360;
+    pitch_range = (-90-step_size/2):step_size:(90+step_size/2);
+    yaw_range = (-step_size/2):step_size:(360+step_size/2);
     N = histcounts2(pitch, yaw, pitch_range, yaw_range);
 
     % Create Gaussian filter matrix:
