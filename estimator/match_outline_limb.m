@@ -4,7 +4,9 @@ function [rms,R,t] = match_outline_limb(outline, limb)
     rms = inf;
     R = eye(3);
     t = zeros(2,1);
-    for ii = 1:size(outline,2)
+    M = size(outline,2);
+    span = 1:floor(M/(360/3)):M;
+    for ii = span
         % Get the current hypothesis arc:
         outline_arc = get_arc(outline, ii, N);
 

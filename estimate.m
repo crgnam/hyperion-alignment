@@ -4,10 +4,10 @@ addpath(genpath('lib'))
 addpath(genpath('estimator'))
 
 % Load the image to be processed:
-% reference_image = 'simulated_data/test_image1.png';
-% true_roll = 111; %(degrees)
-% true_pitch = 33; %(degrees)
-% true_yaw = 22; %(degrees)
+reference_image = 'simulated_data/test_image1.png';
+true_roll = 111; %(degrees)
+true_pitch = 33; %(degrees)
+true_yaw = 22; %(degrees)
 
 % reference_image = 'simulated_data/test_image2.png';
 % true_roll = -105;
@@ -24,10 +24,10 @@ addpath(genpath('estimator'))
 % true_pitch = -45;
 % true_yaw = 240;
 
-reference_image = 'simulated_data/test_image5.png';
-true_roll = 60;
-true_pitch = 77;
-true_yaw = 290;
+% reference_image = 'simulated_data/test_image5.png';
+% true_roll = 60;
+% true_pitch = 77;
+% true_yaw = 290;
 
 %% Settings:
 distance_to_hyperion = 1000;
@@ -41,6 +41,8 @@ min_step = 1; %(degrees)
 rescale = 1/2;
 
 animate = true;
+
+subdivide = 1;
 
 %% Setup:
 % Load in shape model:
@@ -68,7 +70,7 @@ limb = detect_limb(ref,1,1);
 limb = [xl'; yl'];
 
 % Get evenly spaced limb coordinates:
-limb = subdivide_line(limb, 1, false);
+limb = subdivide_line(limb, subdivide, false);
 
 %% Generate initial particle distribution:
 yaw_span   = 0:deg2rad(step_size):2*pi;
@@ -131,7 +133,7 @@ for iter = 1:iterations
         outline = [pixels(1,k); pixels(2,k)];% + [0.5; 0.5]; %(half offset since they sit in the middle of pixels)
 
         % Rasterize the outline (each pixel point along it):
-        outline = subdivide_line(outline, 1, false);
+        outline = subdivide_line(outline, subdivide, false);
 
         % Identify best limb match for current orientation:
         [rms(ii),R,~] = match_outline_limb(outline, limb);
